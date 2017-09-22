@@ -1,17 +1,24 @@
 package com.example.luba.nytimessearch.activities;
 
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
+import android.support.v4.app.DialogFragment;
+import android.support.v4.app.FragmentManager;
+import android.support.v4.view.MenuItemCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.RecyclerView;
+import android.support.v7.widget.SearchView;
 import android.support.v7.widget.StaggeredGridLayoutManager;
-import android.view.View;
-import android.widget.Button;
+import android.support.v7.widget.Toolbar;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.widget.EditText;
 
 import com.example.luba.nytimessearch.R;
 import com.example.luba.nytimessearch.adapters.ArticleRecyclerViewAdapter;
 import com.example.luba.nytimessearch.adapters.OnArticleRecyclerViewAdapterListener;
+import com.example.luba.nytimessearch.fragments.FilterFragment;
 import com.example.luba.nytimessearch.models.Article;
 import com.example.luba.nytimessearch.network.ArticleRestClient;
 import com.example.luba.nytimessearch.network.ArticlesCallback;
@@ -19,16 +26,18 @@ import com.example.luba.nytimessearch.network.Error;
 
 import java.util.ArrayList;
 
+
+
 public class SearchActivity extends AppCompatActivity implements OnArticleRecyclerViewAdapterListener{
 
-    EditText etQuery;
-    //GridView gvResults;
-    Button btnSearch;
     private RecyclerView mRecyclerViewArticles;
     ArrayList<Article> articles;
     int page = 0;
     private ArticleRecyclerViewAdapter mRecyclerArticleArrayAdapter;
     private RecyclerView.LayoutManager mLayoutManager;
+    private Toolbar toolbar;
+    MenuItem searchItem, filterItem;
+    DialogFragment dlgFilter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,12 +53,14 @@ public class SearchActivity extends AppCompatActivity implements OnArticleRecycl
         // Define a layout for RecyclerView
         mLayoutManager = new StaggeredGridLayoutManager(2,StaggeredGridLayoutManager.VERTICAL);
         mRecyclerViewArticles.setLayoutManager(mLayoutManager);
-        etQuery = (EditText) findViewById(R.id.etQuery);
-        //gvResults = (GridView) findViewById(R.id.gvResults);
-        btnSearch = (Button) findViewById(R.id.btnSearch);
+
         articles = new ArrayList<>();
         mRecyclerArticleArrayAdapter = new ArticleRecyclerViewAdapter(articles, this);
         mRecyclerViewArticles.setAdapter(mRecyclerArticleArrayAdapter);
+        toolbar = (Toolbar) findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+
+        dlgFilter = new FilterFragment();
 
 
         //hood up listener for grid click
@@ -68,6 +79,84 @@ public class SearchActivity extends AppCompatActivity implements OnArticleRecycl
         });*/
 
     }
+
+    // Menu icons are inflated just as they were with actionbar
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        // Inflate the menu; this adds items to the action bar if it is present.
+        getMenuInflater().inflate(R.menu.menu_search_activity, menu);
+        searchItem = menu.findItem(R.id.action_search);
+        filterItem = menu.findItem(R.id.action_filter);
+        final SearchView searchView = (SearchView) MenuItemCompat.getActionView(searchItem);
+        searchView.setQueryHint(getString(R.string.hint_search));
+        // Customize searchview text and hint colors
+
+        int searchEditId = android.support.v7.appcompat.R.id.search_src_text;
+        EditText et = (EditText) searchView.findViewById(searchEditId);
+        et.setTextColor(Color.WHITE);
+        et.setHintTextColor(Color.WHITE);
+        searchView.setIconifiedByDefault(false);
+        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                loadArticles(0, query);
+                searchView.clearFocus();
+                return true;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                return false;
+            }
+        });
+
+        MenuItemCompat.setOnActionExpandListener(searchItem,
+                new MenuItemCompat.OnActionExpandListener() {
+                    @Override
+                    public boolean onMenuItemActionExpand(MenuItem menuItem) {
+                        // Return true to allow the action view to expand
+                        filterItem.setVisible(false);
+                        return true;
+                    }
+                    @Override
+                    public boolean onMenuItemActionCollapse(MenuItem menuItem) {
+                        // When the action view is collapsed, reset the query
+                        filterItem.setVisible(true);
+                        // Return true to allow the action view to collapse
+                        return true;
+                    }
+                });
+
+
+        return true;
+    }
+
+    @Override
+
+    public boolean onOptionsItemSelected(MenuItem item) {
+
+        switch (item.getItemId()) {
+
+            case R.id.action_search:
+                filterItem.setVisible(false);
+                return true;
+
+            case R.id.action_filter:
+
+                FragmentManager fm = getSupportFragmentManager();
+                FilterFragment alertDialog = new FilterFragment();
+                alertDialog.show(fm, "fragment_filter");
+
+
+                return true;
+
+            default:
+                return super.onOptionsItemSelected(item);
+
+        }
+
+    }
+
     private void loadArticles(int page, String query) {
         ArticleRestClient.getArticles(page, query, new ArticlesCallback(){
             @Override
@@ -87,10 +176,10 @@ public class SearchActivity extends AppCompatActivity implements OnArticleRecycl
         });
     }
 
-    public void onArticleSearch(View view) {
+    //public void onArticleSearch(View view) {
 
-        String query = etQuery.getText().toString();
-        loadArticles(0, query);
+        //String query = etQuery.getText().toString();
+        //loadArticles(0, query);
         //Toast.makeText(this, "Searching for ="+query, Toast.LENGTH_LONG).show();
         //AsyncHttpClient client = new AsyncHttpClient();
         //String url = "https://api.nytimes.com/svc/search/v2/articlesearch.json";
@@ -133,14 +222,14 @@ public class SearchActivity extends AppCompatActivity implements OnArticleRecycl
 
             }
         });*/
-}
+//}
 
 
 
     @Override
     public void selectArticle(Article article) {
         //create intent to display an article
-        Intent intent = new Intent(this, ArticleActivity.class);
+        Intent intent = new Intent(SearchActivity.this, ArticleActivity.class);
         //get the article to display
         //Article article = articles.get(position);
         //pass in  that the article into intent
@@ -149,5 +238,6 @@ public class SearchActivity extends AppCompatActivity implements OnArticleRecycl
         startActivity(intent);
 
     }
+
 }
 
