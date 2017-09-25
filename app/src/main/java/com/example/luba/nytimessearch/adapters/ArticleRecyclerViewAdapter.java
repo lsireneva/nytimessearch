@@ -2,6 +2,7 @@ package com.example.luba.nytimessearch.adapters;
 
 import android.support.v7.widget.RecyclerView;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -12,7 +13,10 @@ import com.example.luba.nytimessearch.R;
 import com.example.luba.nytimessearch.models.Article;
 import com.squareup.picasso.Picasso;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 
 /**
  * Created by luba on 9/20/17.
@@ -22,15 +26,57 @@ public class ArticleRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVie
 
     private ArrayList<Article> mArticlesNYTimes;
 
+    private final int ARTICLE_IMAGE = 0, ARTICLE_TEXTONLY = 1;
+
+    public interface OnArticleRecyclerViewAdapterListener {
+        void selectArticle(Article article);
+    }
+
+
+    private OnArticleRecyclerViewAdapterListener mRecyclerViewAdapterListener;
+
+    public ArticleRecyclerViewAdapter(ArrayList<Article> articles, OnArticleRecyclerViewAdapterListener listener) {
+        this.mArticlesNYTimes = articles;
+        this.mRecyclerViewAdapterListener = listener;
+    }
+
+
     @Override
     public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-        View view =LayoutInflater.from(parent.getContext()).inflate(R.layout.item_article_result,parent,false);
-        return new ArticleViewHolder(view);
+
+        RecyclerView.ViewHolder viewHolder;
+
+        switch (viewType) {
+            case ARTICLE_IMAGE:
+                View viewPopularMovie = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_article_image, parent, false);
+                viewHolder = new ArticleImageViewHolder(viewPopularMovie);
+                break;
+            case ARTICLE_TEXTONLY:
+                View viewLessPopularMovie = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_article_textonly, parent, false);
+                viewHolder = new ArticleTextOnlyViewHolder(viewLessPopularMovie);
+                break;
+            default:
+                View viewLessPopularMovieDefault = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_article_image, parent, false);
+                viewHolder = new ArticleImageViewHolder(viewLessPopularMovieDefault);
+                break;
+        }
+        return viewHolder;
     }
 
     @Override
     public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
-        ((ArticleViewHolder) holder).setupArticleView(mArticlesNYTimes.get(position));
+
+        switch (holder.getItemViewType()) {
+            case ARTICLE_IMAGE:
+                ((ArticleImageViewHolder) holder).setupArticleView(mArticlesNYTimes.get(position));
+                break;
+            case ARTICLE_TEXTONLY:
+                ((ArticleTextOnlyViewHolder) holder).setupArticleView(mArticlesNYTimes.get(position));
+                break;
+            default:
+                ((ArticleImageViewHolder) holder).setupArticleView(mArticlesNYTimes.get(position));
+                break;
+        }
     }
 
     @Override
@@ -38,55 +84,110 @@ public class ArticleRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVie
         return this.mArticlesNYTimes != null ? this.mArticlesNYTimes.size() : 0;
     }
 
+    @Override
+    public int getItemViewType(int position) {
+        Article article = mArticlesNYTimes.get(position);
+        //Log.d("DEBUG", "article=" + article.getHeadLine());
+        Log.d("DEBUG", "has image=" + article.hasImages());
+        if (article.hasImages()) {
+            return ARTICLE_IMAGE;
+        } else {
+            return ARTICLE_TEXTONLY;
+        }
+        //return mArticlesNYTimes.get(position).getmArticleType().ordinal();
+    }
+
     public void notifyDataSetChanged(ArrayList<Article> articles) {
         this.mArticlesNYTimes = articles;
         notifyDataSetChanged();
     }
 
-    private OnArticleRecyclerViewAdapterListener recyclerViewAdapterListener;
 
-    public ArticleRecyclerViewAdapter(ArrayList<Article> articles, OnArticleRecyclerViewAdapterListener listener) {
-        this.mArticlesNYTimes = articles;
-        this.recyclerViewAdapterListener = listener;
-    }
+    class ArticleImageViewHolder extends RecyclerView.ViewHolder {
 
-}
+        private Article article;
 
- class ArticleViewHolder extends RecyclerView.ViewHolder {
-
-    private Article article;
-
-    ImageView ivImage;
-    TextView tvTitle;
-
-    private OnArticleRecyclerViewAdapterListener recyclerViewAdapterListener;
+        ImageView ivImage;
+        TextView tvTitle;
 
 
-    public ArticleViewHolder(View itemView) {
-        super(itemView);
-
-        ivImage = itemView.findViewById(R.id.ivImage);
-        tvTitle = itemView.findViewById(R.id.tvTitle);
+        public ArticleImageViewHolder(View itemView) {
+            super(itemView);
 
 
-        this.itemView.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
+            ivImage = itemView.findViewById(R.id.ivImage);
+            tvTitle = itemView.findViewById(R.id.tvTitle);
 
-                if (recyclerViewAdapterListener != null)
-                    recyclerViewAdapterListener.selectArticle(article);
-            }
-        });
-    }
 
-    public void setupArticleView(Article article) {
-        this.article = article;
-        if (this.ivImage != null) {
-            ivImage.setImageDrawable(null);
-            String thumbnail = article.getThumbNail();
-            if (!TextUtils.isEmpty(thumbnail)) {
-            Picasso.with(itemView.getContext()).load(thumbnail).into(ivImage);}
+            this.itemView.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+
+                    if (mRecyclerViewAdapterListener != null)
+                        mRecyclerViewAdapterListener.selectArticle(article);
+                }
+            });
         }
-        this.tvTitle.setText(article.getHeadLine());
+
+        public void setupArticleView(Article article) {
+            this.article = article;
+            if (article != null) {
+                if (this.ivImage != null) {
+                    ivImage.setImageDrawable(null);
+                    String thumbnail = article.getFirstImage().getUrl();
+                    if (!TextUtils.isEmpty(thumbnail)) {
+                        Picasso.with(itemView.getContext()).load(thumbnail).into(ivImage);
+                    }
+                }
+                this.tvTitle.setText(article.getHeadline().getTitle());
+            }
+        }
+    }
+
+    class ArticleTextOnlyViewHolder extends RecyclerView.ViewHolder {
+
+
+        private Article article;
+
+        TextView tvTitle;
+        TextView tvDate;
+        TextView tvAuthor;
+
+        public ArticleTextOnlyViewHolder(View itemView) {
+            super(itemView);
+            tvTitle = itemView.findViewById(R.id.tv_title);
+            tvDate = itemView.findViewById(R.id.tv_date);
+            tvAuthor = itemView.findViewById(R.id.tv_author);
+
+            this.itemView.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (mRecyclerViewAdapterListener != null)
+                        mRecyclerViewAdapterListener.selectArticle(article);
+                }
+            });
+        }
+
+        public void setupArticleView(Article article) {
+            this.article = article;
+            if (article != null) {
+
+                tvTitle.setText(article.getHeadline().getTitle());
+
+                SimpleDateFormat dateFormatter = new SimpleDateFormat("MMM dd yyyy");
+                final Calendar c = Calendar.getInstance();
+
+
+                if (article.getPubDate() != null&&article.getByLine() != null) {
+                    Log.d("DEBUG", "article.getPubDate()"+article.getPubDate());
+                    Log.d("DEBUG", "format"+dateFormatter.format(article.getPubDate()));
+                    c.setTime(article.getPubDate());
+                    Date d = new Date(c.get(c.YEAR)-1900, c.get(c.MONTH), c.get(c.DAY_OF_MONTH));
+                    String strDate = dateFormatter.format(d);
+                tvDate.setText(strDate);
+                tvAuthor.setText(article.getByLine().getOriginal());}
+            }
+
+        }
     }
 }

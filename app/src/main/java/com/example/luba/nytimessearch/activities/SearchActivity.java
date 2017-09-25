@@ -1,6 +1,7 @@
 package com.example.luba.nytimessearch.activities;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.support.v4.app.DialogFragment;
@@ -11,33 +12,54 @@ import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.SearchView;
 import android.support.v7.widget.StaggeredGridLayoutManager;
 import android.support.v7.widget.Toolbar;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.EditText;
+import android.widget.Toast;
 
 import com.example.luba.nytimessearch.R;
 import com.example.luba.nytimessearch.adapters.ArticleRecyclerViewAdapter;
-import com.example.luba.nytimessearch.adapters.OnArticleRecyclerViewAdapterListener;
 import com.example.luba.nytimessearch.fragments.FilterFragment;
 import com.example.luba.nytimessearch.models.Article;
+import com.example.luba.nytimessearch.network.ArticleRequestParams;
+import com.example.luba.nytimessearch.network.ArticleResponse;
 import com.example.luba.nytimessearch.network.ArticleRestClient;
 import com.example.luba.nytimessearch.network.ArticlesCallback;
 import com.example.luba.nytimessearch.network.Error;
+import com.example.luba.nytimessearch.utils.EndlessRecyclerViewScrollListener;
+
+import org.parceler.Parcels;
 
 import java.util.ArrayList;
+import java.util.HashSet;
+
+import static com.example.luba.nytimessearch.utils.ArticlesConstants.BEGIN_DATE;
+import static com.example.luba.nytimessearch.utils.ArticlesConstants.FILTER;
+import static com.example.luba.nytimessearch.utils.ArticlesConstants.NEWS_DESK;
+import static com.example.luba.nytimessearch.utils.ArticlesConstants.SORT;
 
 
+public class SearchActivity extends AppCompatActivity implements ArticleRecyclerViewAdapter.OnArticleRecyclerViewAdapterListener, FilterFragment.SaveDialogListener{
 
-public class SearchActivity extends AppCompatActivity implements OnArticleRecyclerViewAdapterListener{
+    private static final String TAG_LOG = SearchActivity.class.getCanonicalName();
 
     private RecyclerView mRecyclerViewArticles;
-    ArrayList<Article> articles;
-    int page = 0;
+    SharedPreferences filterPrefs;
+    String mBeginDate;
+    String mSortOrder;
+    HashSet<String> mNewsDeskValues;
+    ArrayList<Article> mArticles;
+    int mPage=0;
     private ArticleRecyclerViewAdapter mRecyclerArticleArrayAdapter;
-    private RecyclerView.LayoutManager mLayoutManager;
+    StaggeredGridLayoutManager mLayoutManager;
+    EndlessRecyclerViewScrollListener mEndlessListener;
+
     private Toolbar toolbar;
     MenuItem searchItem, filterItem;
     DialogFragment dlgFilter;
+    String mFilter;
+    private SearchView searchView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,60 +69,67 @@ public class SearchActivity extends AppCompatActivity implements OnArticleRecycl
         setupViews();
     }
 
-    public void setupViews() {
-        mRecyclerViewArticles = (RecyclerView) findViewById(R.id.rvArticles);
-        mRecyclerViewArticles.setHasFixedSize(true);
-        // Define a layout for RecyclerView
-        mLayoutManager = new StaggeredGridLayoutManager(2,StaggeredGridLayoutManager.VERTICAL);
-        mRecyclerViewArticles.setLayoutManager(mLayoutManager);
+    public void getFilterFromSharedPreferences() {
+        filterPrefs = getSharedPreferences(FILTER, 0);
+        mSortOrder = filterPrefs.getString(SORT, null);
+        mBeginDate = filterPrefs.getString(BEGIN_DATE, null);
+        mNewsDeskValues = (HashSet<String>) filterPrefs.getStringSet(NEWS_DESK, null);
+    }
 
-        articles = new ArrayList<>();
-        mRecyclerArticleArrayAdapter = new ArticleRecyclerViewAdapter(articles, this);
-        mRecyclerViewArticles.setAdapter(mRecyclerArticleArrayAdapter);
+    public void setupViews() {
+        mArticles = new ArrayList<Article>();
         toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
         dlgFilter = new FilterFragment();
 
+        // setup RecyclerView
+        mRecyclerViewArticles = (RecyclerView) findViewById(R.id.rvArticles);
+        mRecyclerViewArticles.setHasFixedSize(true);
+        mLayoutManager = new StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL);
+        mRecyclerViewArticles.setLayoutManager(mLayoutManager);
 
-        //hood up listener for grid click
-        /*mRecyclerViewArticles.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+        mRecyclerArticleArrayAdapter = new ArticleRecyclerViewAdapter(mArticles, this);
+        mRecyclerViewArticles.setAdapter(mRecyclerArticleArrayAdapter);
+
+        mEndlessListener = new EndlessRecyclerViewScrollListener(mLayoutManager) {
             @Override
-            public void onItemClick(AdapterView<?> adapterView, View view, int position, long l) {
-                //create intent to display an article
-                Intent intent = new Intent(getApplicationContext(), ArticleActivity.class);
-                //get the article to display
-                Article article = articles.get(position);
-                //pass in  that the article into intent
-                intent.putExtra("article", article);
-                //launch the activity
-                startActivity(intent);
+            public void onLoadMore(int page, int totalItemsCount) {
+                Log.d(TAG_LOG, "loadNextPage: " + String.valueOf(page));
+                if (page > 100) {
+                   Toast.makeText(SearchActivity.this,getString(R.string.error_loading),Toast.LENGTH_LONG).show();
+
+                } else {
+                    loadArticles(page);
+                    mRecyclerArticleArrayAdapter.notifyDataSetChanged();
+
+                }
             }
-        });*/
+        };
+        mRecyclerViewArticles.addOnScrollListener(mEndlessListener);
 
     }
 
-    // Menu icons are inflated just as they were with actionbar
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.menu_search_activity, menu);
         searchItem = menu.findItem(R.id.action_search);
         filterItem = menu.findItem(R.id.action_filter);
         final SearchView searchView = (SearchView) MenuItemCompat.getActionView(searchItem);
         searchView.setQueryHint(getString(R.string.hint_search));
-        // Customize searchview text and hint colors
-
-        int searchEditId = android.support.v7.appcompat.R.id.search_src_text;
-        EditText et = (EditText) searchView.findViewById(searchEditId);
+        //int searchEditId =R.id.search_src_text;
+        EditText et = (EditText) searchView.findViewById(R.id.search_src_text);
         et.setTextColor(Color.WHITE);
         et.setHintTextColor(Color.WHITE);
         searchView.setIconifiedByDefault(false);
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
             public boolean onQueryTextSubmit(String query) {
-                loadArticles(0, query);
+                mFilter = query;
                 searchView.clearFocus();
+                setTitle(query);
+                loadArticles(0);
                 return true;
             }
 
@@ -116,8 +145,10 @@ public class SearchActivity extends AppCompatActivity implements OnArticleRecycl
                     public boolean onMenuItemActionExpand(MenuItem menuItem) {
                         // Return true to allow the action view to expand
                         filterItem.setVisible(false);
+                        searchView.setQuery(mFilter, false);
                         return true;
                     }
+
                     @Override
                     public boolean onMenuItemActionCollapse(MenuItem menuItem) {
                         // When the action view is collapsed, reset the query
@@ -139,14 +170,12 @@ public class SearchActivity extends AppCompatActivity implements OnArticleRecycl
 
             case R.id.action_search:
                 filterItem.setVisible(false);
+
                 return true;
 
             case R.id.action_filter:
-
-                FragmentManager fm = getSupportFragmentManager();
-                FilterFragment alertDialog = new FilterFragment();
-                alertDialog.show(fm, "fragment_filter");
-
+                getFilterFromSharedPreferences();
+                startFilterFragmentDialog();
 
                 return true;
 
@@ -157,87 +186,103 @@ public class SearchActivity extends AppCompatActivity implements OnArticleRecycl
 
     }
 
-    private void loadArticles(int page, String query) {
-        ArticleRestClient.getArticles(page, query, new ArticlesCallback(){
-            @Override
-            public void onSuccess(ArrayList<Article> articles) {
-                //SearchActivity.this.articles = new ArrayList<>();
-                SearchActivity.this.articles.addAll(articles);
-                //SearchActivity.this.page = page;
-                mRecyclerArticleArrayAdapter.notifyDataSetChanged(SearchActivity.this.articles);
-            }
-
-            @Override
-            public void onError(Error error) {
-
-            }
-
-
-        });
+    private void startFilterFragmentDialog() {
+        FragmentManager fm = getSupportFragmentManager();
+        FilterFragment filterSettingsDialogFragment = FilterFragment.newInstance(mBeginDate,mSortOrder, mNewsDeskValues);
+        filterSettingsDialogFragment.show(fm,"filter_fragment");
     }
 
-    //public void onArticleSearch(View view) {
+    public String getNewsDeskFilterQuery(){
+        String values = "";
+        for(String value:mNewsDeskValues){
+            values = values.concat("\""+value+"\"").concat(" ");
+        }
+        return new String(NEWS_DESK +":("+values+")");
+    }
 
-        //String query = etQuery.getText().toString();
-        //loadArticles(0, query);
-        //Toast.makeText(this, "Searching for ="+query, Toast.LENGTH_LONG).show();
-        //AsyncHttpClient client = new AsyncHttpClient();
-        //String url = "https://api.nytimes.com/svc/search/v2/articlesearch.json";
+    private void loadArticles(final int page) {
+        Log.d (TAG_LOG, "loadArticles="+page);
 
-        /*RequestParams params = new RequestParams();
-        params.put("api-key", "fe88e156392e4d298664ccffeb5485e1");
-        params.put("page", 0);
-        params.put("q", query);
+        ArticleRequestParams requestParams = new ArticleRequestParams();
 
+        if (mFilter != null && !"".equals(mFilter)) {
 
-        ArticleRestClient.getArticles(new ArticlesCallback(){
-            @Override
-            public void onSuccess(ArrayList<Article> articles) {
-                SearchActivity.this.articles = new ArrayList<>();
-                SearchActivity.this.articles.addAll(articles);
-                mRecyclerArticleArrayAdapter.notifyDataSetChanged(SearchActivity.this.articles);
+            requestParams.setPage(page);
+            requestParams.setQuery(mFilter);
+        }
+
+            if (mBeginDate != null && !"".equals(mBeginDate)) {
+                requestParams.setBeginDate(mBeginDate);
             }
 
-            @Override
-            public void onError(Error error) {
-                error.printStackTrace();
+            if (mSortOrder != null && !"".equals(mSortOrder)) {
+                requestParams.setSortOrder(mSortOrder);
             }
-        });
 
-        /*client.get(url, params, new JsonHttpResponseHandler() {
-            @Override
-            public void onSuccess(int statusCode, Header[] headers, JSONObject response) {
-                //super.onSuccess(statusCode, headers, response);
-                //Log.d ("DEBUG", response.toString());
+            if (mNewsDeskValues != null && mNewsDeskValues.size() >= 1) {
+                requestParams.setNewsDesk(getNewsDeskFilterQuery());
+            }
 
-                JSONArray articleJsonResults = null;
-                try {
-                    articleJsonResults = response.getJSONObject("response"). getJSONArray("docs");
-                    mRecyclerViewArticles.addAll(Article.fromJsonArray(articleJsonResults));
-                    //articleArrayAdapter.notifyDataSetChanged();
-                    //Log.d ("DEBUG", articles.toString());
-                } catch (JSONException e) {
-                    e.printStackTrace();
+            ArticleRestClient.getArticles(requestParams, new ArticlesCallback() {
+
+
+                @Override
+                public void onSuccess(ArticleResponse response) {
+
+                    if (response.getArticles() != null) {
+                        if (response.getArticles().size() > 0) {
+                            mPage = page;
+                        }
+                        if (mArticles == null) {
+                            mArticles = new ArrayList<>();
+                        }
+                        mArticles.addAll(response.getArticles());
+                        Log.d(TAG_LOG, "addall");
+                        mRecyclerArticleArrayAdapter.notifyDataSetChanged(mArticles);
+
+                        if (page == 0) {
+                            mRecyclerViewArticles.scrollToPosition(0);
+                        }
+                    }
+
                 }
 
-            }
-        });*/
-//}
+                @Override
+                public void onError(Error error) {
 
+                }
+
+
+            });
+        }
+
+
+        @Override
+        public void selectArticle (Article article){
+
+            Intent intent = new Intent(SearchActivity.this, ArticleActivity.class);
+            Bundle bundle = new Bundle();
+            bundle.putParcelable("article", Parcels.wrap(article));
+            intent = intent.putExtras(bundle);
+
+            startActivity(intent);
+        }
 
 
     @Override
-    public void selectArticle(Article article) {
-        //create intent to display an article
-        Intent intent = new Intent(SearchActivity.this, ArticleActivity.class);
-        //get the article to display
-        //Article article = articles.get(position);
-        //pass in  that the article into intent
-        intent.putExtra("article", article);
-        //launch the activity
-        startActivity(intent);
+    public void onFinishEditDialog(String beginDate, String sortOrder, HashSet<String> newsDeskValueSet) {
+        mBeginDate = beginDate;
+        mSortOrder = sortOrder;
+        mNewsDeskValues =  newsDeskValueSet;
+
+        SharedPreferences.Editor editor = filterPrefs.edit();
+        editor.putString(SORT, sortOrder);
+        editor.putString(BEGIN_DATE,beginDate);
+        editor.putStringSet(NEWS_DESK, newsDeskValueSet);
+        editor.commit();
+
+        loadArticles(mPage);
+        mRecyclerArticleArrayAdapter.notifyDataSetChanged();
 
     }
-
 }
-

@@ -1,97 +1,102 @@
 package com.example.luba.nytimessearch.models;
 
-import android.os.Parcel;
-import android.os.Parcelable;
 
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
+import com.google.gson.annotations.SerializedName;
+
+import org.parceler.Parcel;
+
+import java.util.ArrayList;
+import java.util.Date;
 
 /**
  * Created by luba on 9/19/17.
  */
 
-public class Article implements Parcelable{
-    String webURL;
-    String headLine;
-    String thumbNail;
+@Parcel
+public class Article{
 
-    protected Article(Parcel in) {
-        webURL = in.readString();
-        headLine = in.readString();
-        thumbNail = in.readString();
+
+    @SerializedName("web_url")
+    String mWebURL;
+
+    @SerializedName("headline")
+    Headline mHeadline;
+
+    @SerializedName("url")
+    String mThumbNail;
+
+    @SerializedName("pub_date")
+    Date mPubDate;
+
+    @SerializedName("byline")
+    Byline mByLine;
+
+    @SerializedName("news_desk")
+    String mNewsDesk;
+
+    @SerializedName("multimedia")
+    ArrayList<Multimedia> mMultimedia;
+
+
+    public Article(){
+
     }
 
-    public static final Creator<Article> CREATOR = new Creator<Article>() {
-        @Override
-        public Article createFromParcel(Parcel in) {
-            return new Article(in);
+
+    public String getWebURL() {
+        return mWebURL;
+    }
+    public void setWebUrl(String webUrl) {
+        this.mWebURL = mWebURL;
+    }
+
+    public Headline getHeadline() {
+        return mHeadline;
+    }
+
+    public void setHeadline(Headline mHeadline) {
+        this.mHeadline = mHeadline;
+    }
+
+
+    public ArrayList<Multimedia> getMultimedia() {
+        return mMultimedia;
+    }
+
+    public void setMultimedia(ArrayList<Multimedia> mMultimedia) {
+        this.mMultimedia = mMultimedia;
+    }
+
+
+    public Date getPubDate() {
+        return mPubDate;
+    }
+
+    public void setPubDate(Date mPubDate) {
+        this.mPubDate = mPubDate;
+    }
+
+
+    public Byline getByLine() {
+        return mByLine;
+    }
+
+    public void setByLine(Byline mByLine) {
+        this.mByLine = mByLine;
+    }
+
+
+
+    public boolean hasImages() {
+        return this.mMultimedia != null && this.mMultimedia.size() > 0;
+    }
+
+    public Multimedia getFirstImage() {
+        if (this.mMultimedia != null && this.mMultimedia.size() > 0) {
+            return this.mMultimedia.get(0);
         }
-
-        @Override
-        public Article[] newArray(int size) {
-            return new Article[size];
-        }
-    };
-
-    public String getWeURL() {
-        return webURL;
-    }
-
-    public String getHeadLine() {
-        return headLine;
-    }
-
-    public String getThumbNail() {
-        return thumbNail;
-    }
-
-    public void setTitle(String headLine) {
-        this.headLine = headLine;
+        return null;
     }
 
 
-    public Article (JSONObject jsonObject) throws JSONException{
-        if (jsonObject.has("headLine")) setTitle(jsonObject.getJSONObject("headline").getString("main"));
-        try {
-            this.webURL = jsonObject.getString("web_url");
-            this.headLine = jsonObject.getJSONObject("headline").getString("main");
-
-            JSONArray multimedia = jsonObject.getJSONArray("multimedia");
-            if (multimedia.length()>0) {
-                JSONObject multimediaJson = multimedia.getJSONObject(0);
-                this.thumbNail = "http://www.nytimes.com/"+multimediaJson.getString("url");
-                //Log.d ("DEBUG", "multimediaJson.getString(\"url\")="+multimediaJson.getString("url"));
-            } else {
-                this.thumbNail = "";
-            }
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
-    }
-
-   /* public static ArrayList<Article> fromJsonArray(JSONArray array) {
-        ArrayList<Article> results = new ArrayList<>();
-
-        for (int i=0; i<array.length(); i++) {
-            try {
-                results.add(new Article(array.getJSONObject(i)));
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-        }
-        return results;
-    }*/
-
-    @Override
-    public int describeContents() {
-        return 0;
-    }
-
-    @Override
-    public void writeToParcel(Parcel parcel, int i) {
-        parcel.writeString(webURL);
-        parcel.writeString(headLine);
-        parcel.writeString(thumbNail);
-    }
 }

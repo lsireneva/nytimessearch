@@ -1,17 +1,13 @@
 package com.example.luba.nytimessearch.network;
 
-import android.util.Log;
-
-import com.example.luba.nytimessearch.models.Article;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.gson.JsonSyntaxException;
 import com.loopj.android.http.AsyncHttpClient;
-import com.loopj.android.http.JsonHttpResponseHandler;
 import com.loopj.android.http.RequestParams;
-
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import java.util.ArrayList;
+import com.loopj.android.http.TextHttpResponseHandler;
 
 import cz.msebera.android.httpclient.Header;
 
@@ -27,34 +23,54 @@ public class ArticleRestClient {
     private static AsyncHttpClient client = new AsyncHttpClient();
 
 
-    /*public static void get(String url, RequestParams params, AsyncHttpResponseHandler responseHandler) {
-        if (params == null) {
-            params = new RequestParams();
-        }
-        params.put("api_key", API_KEY);
-
-        client.get(BASE_URL, params, responseHandler);
-    }*/
-
-    /*private static String getAbsoluteUrl(String relativeUrl) {
-        return BASE_URL + relativeUrl;
-    }*/
-
-
-    public static void getArticles(int page, String query, final ArticlesCallback callback) {
-
-        Log.d ("DEBUG", "getArticles()");
-        Log.d ("DEBUG", "page="+page);
-        Log.d ("DEBUG", "query="+query);
+    public static void getArticles(ArticleRequestParams requestParams, final ArticlesCallback callback) {
 
         RequestParams params = new RequestParams();
-        params.put("api_key", API_KEY);
-        params.put("page", String.valueOf(page));
-        params.put("query", String.valueOf(query));
+        params.put("api-key", API_KEY);
+        params.put("page", requestParams.getPage());
+        params.put("q", requestParams.getQuery());
 
 
-        client.get(BASE_URL, params, new JsonHttpResponseHandler() {
+        if (requestParams.getBeginDate() != null) {
+            params.put("begin_date", requestParams.getBeginDate());
+        }
+        if (requestParams.getSortOrder() != null) {
+            params.put("sort", requestParams.getSortOrder());
+        }
+        if (requestParams.getNewsDesk() != null) {
+            params.put("fq", requestParams.getNewsDesk());
+        }
+
+
+        client.get(BASE_URL, params, new TextHttpResponseHandler() {
             @Override
+            public void onFailure(int statusCode, Header[] headers, String responseString, Throwable throwable) {
+                callback.onError(new Error(throwable.getMessage()));
+            }
+
+            @Override
+            public void onSuccess(int statusCode, Header[] headers, String responseString) {
+                Gson gson = new GsonBuilder().create();
+                // Define Response class to correspond to the JSON response returned
+                gson.fromJson(responseString, ArticleResponse.class);
+
+                try {
+                    JsonParser parser = new JsonParser();
+                    JsonObject jsonObject = parser.parse(responseString).getAsJsonObject();
+                    gson = new GsonBuilder()
+                            .setDateFormat("yyyy-MM-dd'T'HH:mm:ssZ")
+                            .create();
+                    ArticleResponse articleResponse = gson.fromJson(jsonObject.get("response"), ArticleResponse.class);
+                    callback.onSuccess(articleResponse);
+                } catch (JsonSyntaxException ex) {
+                    ex.printStackTrace();
+                    callback.onError(new Error(ex.getMessage()));
+                }
+            }
+
+        });
+
+           /* @Override
             public void onSuccess(int statusCode, Header[] headers, JSONObject response) {
                 //Log.d ("DEBUG", response.toString());
 
@@ -63,17 +79,16 @@ public class ArticleRestClient {
 
                 try {
 
-                    //int page = response.getInt("page");
-                    //String query=response.getString("query");
-                    //Log.d ("DEBUG", "page="+page);
-                    //Log.d ("DEBUG", "query="+query);
                     articleJsonResults = response.getJSONObject("response"). getJSONArray("docs");
                     Log.d ("DEBUG", articleJsonResults.toString());
                     for (int i = 0; i < articleJsonResults.length(); i++) {
 
                         articles.add(new Article(articleJsonResults.getJSONObject(i)));
                     }
-                    callback.onSuccess(articles);
+                    ArticleResponse articleResponse = new ArticleResponse();
+                    articleResponse.setArticleJsonResults(articleJsonResults);
+                    articleResponse.setArticles(articles);
+                    callback.onSuccess(articleResponse);
 
                 } catch (JSONException e) {
                     e.printStackTrace();
@@ -87,7 +102,8 @@ public class ArticleRestClient {
             }
 
 
-        });
+        });*/
+
 
     }
 }
