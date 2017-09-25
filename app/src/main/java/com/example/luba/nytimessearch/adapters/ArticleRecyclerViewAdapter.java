@@ -9,9 +9,9 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import com.bumptech.glide.Glide;
 import com.example.luba.nytimessearch.R;
 import com.example.luba.nytimessearch.models.Article;
-import com.squareup.picasso.Picasso;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -87,7 +87,6 @@ public class ArticleRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVie
     @Override
     public int getItemViewType(int position) {
         Article article = mArticlesNYTimes.get(position);
-        //Log.d("DEBUG", "article=" + article.getHeadLine());
         Log.d("DEBUG", "has image=" + article.hasImages());
         if (article.hasImages()) {
             return ARTICLE_IMAGE;
@@ -107,15 +106,14 @@ public class ArticleRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVie
 
         private Article article;
 
-        ImageView ivImage;
+        ImageView ivImageView;
         TextView tvTitle;
 
 
         public ArticleImageViewHolder(View itemView) {
             super(itemView);
 
-
-            ivImage = itemView.findViewById(R.id.ivImage);
+            ivImageView= itemView.findViewById(R.id.ivImage);
             tvTitle = itemView.findViewById(R.id.tvTitle);
 
 
@@ -132,11 +130,14 @@ public class ArticleRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVie
         public void setupArticleView(Article article) {
             this.article = article;
             if (article != null) {
-                if (this.ivImage != null) {
-                    ivImage.setImageDrawable(null);
-                    String thumbnail = article.getFirstImage().getUrl();
+                if (this.ivImageView != null) {
+                    ivImageView.setImageDrawable(null);
+                    String thumbnail = article.getFirstImageFromMultimedia().getUrl();
                     if (!TextUtils.isEmpty(thumbnail)) {
-                        Picasso.with(itemView.getContext()).load(thumbnail).into(ivImage);
+                        //Picasso.with(itemView.getContext()).load(thumbnail).into(ivImage);
+                        Glide.with(itemView.getContext())
+                                .load(article.getFirstImageFromMultimedia().getUrl())
+                                .into(ivImageView);
                     }
                 }
                 this.tvTitle.setText(article.getHeadline().getTitle());

@@ -91,7 +91,7 @@ public class Article{
         return this.mMultimedia != null && this.mMultimedia.size() > 0;
     }
 
-    public Multimedia getFirstImage() {
+    public Multimedia getFirstImageFromMultimedia() {
         if (this.mMultimedia != null && this.mMultimedia.size() > 0) {
             return this.mMultimedia.get(0);
         }
