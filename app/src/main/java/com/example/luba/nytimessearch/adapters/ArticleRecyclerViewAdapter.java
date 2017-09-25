@@ -190,5 +190,10 @@ public class ArticleRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVie
             }
 
         }
+
+    }
+    public void clearAdapter() {
+        if (!mArticlesNYTimes.isEmpty()) {mArticlesNYTimes.clear();}
+        notifyDataSetChanged();
     }
 }

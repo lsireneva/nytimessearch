@@ -129,6 +129,7 @@ public class SearchActivity extends AppCompatActivity implements ArticleRecycler
                 mFilter = query;
                 searchView.clearFocus();
                 setTitle(query);
+                //mRecyclerArticleArrayAdapter.clearAdapter();
                 loadArticles(0);
                 return true;
             }
@@ -281,8 +282,10 @@ public class SearchActivity extends AppCompatActivity implements ArticleRecycler
         editor.putStringSet(NEWS_DESK, newsDeskValueSet);
         editor.commit();
 
+        //mRecyclerArticleArrayAdapter.clearAdapter();
+
         loadArticles(mPage);
-        mRecyclerArticleArrayAdapter.notifyDataSetChanged();
+
 
     }
 }
